@@ -81,7 +81,7 @@ out_unlock:
  *
  * mmap_lock (MM)
  *   sb_start_pagefault (vfs, freeze)
- *     address_space->invalidate_lock
+ *     ext2_inode_info->dax_sem
  *       address_space->i_mmap_rwsem or page_lock (mutually exclusive in DAX)
  *         ext2_inode_info->truncate_mutex
  *
@@ -91,33 +91,34 @@ out_unlock:
 static vm_fault_t ext2_dax_fault(struct vm_fault *vmf)
 {
 	struct inode *inode = file_inode(vmf->vma->vm_file);
+	struct ext2_inode_info *ei = EXT2_I(inode);
 	vm_fault_t ret;
 	bool write = (vmf->flags & FAULT_FLAG_WRITE) &&
-		(vmf->vma->vm_flags & VM_SHARED);
+		     (vmf->vma->vm_flags & VM_SHARED);
 
 	if (write) {
 		sb_start_pagefault(inode->i_sb);
 		file_update_time(vmf->vma->vm_file);
 	}
-	filemap_invalidate_lock_shared(inode->i_mapping);
+	down_read(&ei->dax_sem);
 
 	ret = dax_iomap_fault(vmf, PE_SIZE_PTE, NULL, NULL, &ext2_iomap_ops);
 
-	filemap_invalidate_unlock_shared(inode->i_mapping);
+	up_read(&ei->dax_sem);
 	if (write)
 		sb_end_pagefault(inode->i_sb);
 	return ret;
 }
 
 static const struct vm_operations_struct ext2_dax_vm_ops = {
-	.fault		= ext2_dax_fault,
+	.fault = ext2_dax_fault,
 	/*
 	 * .huge_fault is not supported for DAX because allocation in ext2
 	 * cannot be reliably aligned to huge page sizes and so pmd faults
 	 * will always fail and fail back to regular faults.
 	 */
-	.page_mkwrite	= ext2_dax_fault,
-	.pfn_mkwrite	= ext2_dax_fault,
+	.page_mkwrite = ext2_dax_fault,
+	.pfn_mkwrite = ext2_dax_fault,
 };
 
 static int ext2_file_mmap(struct file *file, struct vm_area_struct *vma)
@@ -130,7 +131,7 @@ static int ext2_file_mmap(struct file *file, struct vm_area_struct *vma)
 	return 0;
 }
 #else
-#define ext2_file_mmap	generic_file_mmap
+#define ext2_file_mmap generic_file_mmap
 #endif
 
 /*
@@ -138,7 +139,7 @@ static int ext2_file_mmap(struct file *file, struct vm_area_struct *vma)
  * for a single struct file are closed. Note that different open() calls
  * for the same file yield different struct file structures.
  */
-static int ext2_release_file (struct inode * inode, struct file * filp)
+static int ext2_release_file(struct inode *inode, struct file *filp)
 {
 	if (filp->f_mode & FMODE_WRITE) {
 		mutex_lock(&EXT2_I(inode)->truncate_mutex);
@@ -180,29 +181,29 @@ static ssize_t ext2_file_write_iter(struct kiocb *iocb, struct iov_iter *from)
 }
 
 const struct file_operations ext2_file_operations = {
-	.llseek		= generic_file_llseek,
-	.read_iter	= ext2_file_read_iter,
-	.write_iter	= ext2_file_write_iter,
+	.llseek = generic_file_llseek,
+	.read_iter = ext2_file_read_iter,
+	.write_iter = ext2_file_write_iter,
 	.unlocked_ioctl = ext2_ioctl,
 #ifdef CONFIG_COMPAT
-	.compat_ioctl	= ext2_compat_ioctl,
+	.compat_ioctl = ext2_compat_ioctl,
 #endif
-	.mmap		= ext2_file_mmap,
-	.open		= dquot_file_open,
-	.release	= ext2_release_file,
-	.fsync		= ext2_fsync,
+	.mmap = ext2_file_mmap,
+	.open = dquot_file_open,
+	.release = ext2_release_file,
+	.fsync = ext2_fsync,
 	.get_unmapped_area = thp_get_unmapped_area,
-	.splice_read	= generic_file_splice_read,
-	.splice_write	= iter_file_splice_write,
+	.splice_read = generic_file_splice_read,
+	.splice_write = iter_file_splice_write,
 };
 
 const struct inode_operations ext2_file_inode_operations = {
-	.listxattr	= ext2_listxattr,
-	.getattr	= ext2_getattr,
-	.setattr	= ext2_setattr,
-	.get_acl	= ext2_get_acl,
-	.set_acl	= ext2_set_acl,
-	.fiemap		= ext2_fiemap,
-	.fileattr_get	= ext2_fileattr_get,
-	.fileattr_set	= ext2_fileattr_set,
+	.listxattr = ext2_listxattr,
+	.getattr = ext2_getattr,
+	.setattr = ext2_setattr,
+	.get_acl = ext2_get_acl,
+	.set_acl = ext2_set_acl,
+	.fiemap = ext2_fiemap,
+	.fileattr_get = ext2_fileattr_get,
+	.fileattr_set = ext2_fileattr_set,
 };

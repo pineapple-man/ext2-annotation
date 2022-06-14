@@ -70,8 +70,7 @@ static inline unsigned ext2_chunk_size(struct inode *inode)
  * Return the offset into page `page_nr' of the last valid
  * byte in that page, plus one.
  */
-static unsigned
-ext2_last_byte(struct inode *inode, unsigned long page_nr)
+static unsigned ext2_last_byte(struct inode *inode, unsigned long page_nr)
 {
 	unsigned last_byte = inode->i_size;
 
@@ -90,8 +89,8 @@ static int ext2_commit_chunk(struct page *page, loff_t pos, unsigned len)
 	inode_inc_iversion(dir);
 	block_write_end(NULL, mapping, pos, len, len, page, NULL);
 
-	if (pos+len > dir->i_size) {
-		i_size_write(dir, pos+len);
+	if (pos + len > dir->i_size) {
+		i_size_write(dir, pos + len);
 		mark_inode_dirty(dir);
 	}
 
@@ -106,11 +105,12 @@ static int ext2_commit_chunk(struct page *page, loff_t pos, unsigned len)
 	return err;
 }
 
-static bool ext2_check_page(struct page *page, int quiet, char *kaddr)
+static bool ext2_check_page(struct page *page, int quiet)
 {
 	struct inode *dir = page->mapping->host;
 	struct super_block *sb = dir->i_sb;
 	unsigned chunk_size = ext2_chunk_size(dir);
+	char *kaddr = page_address(page);
 	u32 max_inumber = le32_to_cpu(EXT2_SB(sb)->s_es->s_inodes_count);
 	unsigned offs, rec_len;
 	unsigned limit = PAGE_SIZE;
@@ -134,7 +134,7 @@ static bool ext2_check_page(struct page *page, int quiet, char *kaddr)
 			goto Ealign;
 		if (unlikely(rec_len < EXT2_DIR_REC_LEN(p->name_len)))
 			goto Enamelen;
-		if (unlikely(((offs + rec_len - 1) ^ offs) & ~(chunk_size-1)))
+		if (unlikely(((offs + rec_len - 1) ^ offs) & ~(chunk_size - 1)))
 			goto Espan;
 		if (unlikely(le32_to_cpu(p->inode) > max_inumber))
 			goto Einumber;
@@ -150,8 +150,9 @@ out:
 Ebadsize:
 	if (!quiet)
 		ext2_error(sb, __func__,
-			"size of directory #%lu is not a multiple "
-			"of chunk size", dir->i_ino);
+			   "size of directory #%lu is not a multiple "
+			   "of chunk size",
+			   dir->i_ino);
 	goto fail;
 Eshort:
 	error = "rec_len is smaller than minimal";
@@ -169,20 +170,22 @@ Einumber:
 	error = "inode out of bounds";
 bad_entry:
 	if (!quiet)
-		ext2_error(sb, __func__, "bad entry in directory #%lu: : %s - "
-			"offset=%lu, inode=%lu, rec_len=%d, name_len=%d",
-			dir->i_ino, error, (page->index<<PAGE_SHIFT)+offs,
-			(unsigned long) le32_to_cpu(p->inode),
-			rec_len, p->name_len);
+		ext2_error(sb, __func__,
+			   "bad entry in directory #%lu: : %s - "
+			   "offset=%lu, inode=%lu, rec_len=%d, name_len=%d",
+			   dir->i_ino, error,
+			   (page->index << PAGE_SHIFT) + offs,
+			   (unsigned long)le32_to_cpu(p->inode), rec_len,
+			   p->name_len);
 	goto fail;
 Eend:
 	if (!quiet) {
 		p = (ext2_dirent *)(kaddr + offs);
 		ext2_error(sb, "ext2_check_page",
-			"entry in directory #%lu spans the page boundary"
-			"offset=%lu, inode=%lu",
-			dir->i_ino, (page->index<<PAGE_SHIFT)+offs,
-			(unsigned long) le32_to_cpu(p->inode));
+			   "entry in directory #%lu spans the page boundary"
+			   "offset=%lu, inode=%lu",
+			   dir->i_ino, (page->index << PAGE_SHIFT) + offs,
+			   (unsigned long)le32_to_cpu(p->inode));
 	}
 fail:
 	SetPageError(page);
@@ -196,16 +199,15 @@ fail:
  * NOTE: ext2_find_entry() and ext2_dotdot() act as a call to ext2_get_page()
  * and should be treated as a call to ext2_get_page() for nesting purposes.
  */
-static struct page * ext2_get_page(struct inode *dir, unsigned long n,
-				   int quiet, void **page_addr)
+static struct page *ext2_get_page(struct inode *dir, unsigned long n, int quiet,
+				  void **page_addr)
 {
 	struct address_space *mapping = dir->i_mapping;
 	struct page *page = read_mapping_page(mapping, n, NULL);
 	if (!IS_ERR(page)) {
 		*page_addr = kmap_local_page(page);
 		if (unlikely(!PageChecked(page))) {
-			if (PageError(page) || !ext2_check_page(page, quiet,
-								*page_addr))
+			if (PageError(page) || !ext2_check_page(page, quiet))
 				goto fail;
 		}
 	}
@@ -221,8 +223,8 @@ fail:
  *
  * len <= EXT2_NAME_LEN and de != NULL are guaranteed by caller.
  */
-static inline int ext2_match (int len, const char * const name,
-					struct ext2_dir_entry_2 * de)
+static inline int ext2_match(int len, const char *const name,
+			     struct ext2_dir_entry_2 *de)
 {
 	if (len != de->name_len)
 		return 0;
@@ -236,16 +238,15 @@ static inline int ext2_match (int len, const char * const name,
  */
 static inline ext2_dirent *ext2_next_entry(ext2_dirent *p)
 {
-	return (ext2_dirent *)((char *)p +
-			ext2_rec_len_from_disk(p->rec_len));
+	return (ext2_dirent *)((char *)p + ext2_rec_len_from_disk(p->rec_len));
 }
 
-static inline unsigned 
-ext2_validate_entry(char *base, unsigned offset, unsigned mask)
+static inline unsigned ext2_validate_entry(char *base, unsigned offset,
+					   unsigned mask)
 {
-	ext2_dirent *de = (ext2_dirent*)(base + offset);
-	ext2_dirent *p = (ext2_dirent*)(base + (offset&mask));
-	while ((char*)p < (char*)de) {
+	ext2_dirent *de = (ext2_dirent *)(base + offset);
+	ext2_dirent *p = (ext2_dirent *)(base + (offset & mask));
+	while ((char *)p < (char *)de) {
 		if (p->rec_len == 0)
 			break;
 		p = ext2_next_entry(p);
@@ -255,14 +256,14 @@ ext2_validate_entry(char *base, unsigned offset, unsigned mask)
 
 static inline void ext2_set_de_type(ext2_dirent *de, struct inode *inode)
 {
-	if (EXT2_HAS_INCOMPAT_FEATURE(inode->i_sb, EXT2_FEATURE_INCOMPAT_FILETYPE))
+	if (EXT2_HAS_INCOMPAT_FEATURE(inode->i_sb,
+				      EXT2_FEATURE_INCOMPAT_FILETYPE))
 		de->file_type = fs_umode_to_ftype(inode->i_mode);
 	else
 		de->file_type = 0;
 }
 
-static int
-ext2_readdir(struct file *file, struct dir_context *ctx)
+static int ext2_readdir(struct file *file, struct dir_context *ctx)
 {
 	loff_t pos = ctx->pos;
 	struct inode *inode = file_inode(file);
@@ -270,7 +271,7 @@ ext2_readdir(struct file *file, struct dir_context *ctx)
 	unsigned int offset = pos & ~PAGE_MASK;
 	unsigned long n = pos >> PAGE_SHIFT;
 	unsigned long npages = dir_pages(inode);
-	unsigned chunk_mask = ~(ext2_chunk_size(inode)-1);
+	unsigned chunk_mask = ~(ext2_chunk_size(inode) - 1);
 	bool need_revalidate = !inode_eq_iversion(inode, file->f_version);
 	bool has_filetype;
 
@@ -280,32 +281,32 @@ ext2_readdir(struct file *file, struct dir_context *ctx)
 	has_filetype =
 		EXT2_HAS_INCOMPAT_FEATURE(sb, EXT2_FEATURE_INCOMPAT_FILETYPE);
 
-	for ( ; n < npages; n++, offset = 0) {
+	for (; n < npages; n++, offset = 0) {
 		char *kaddr, *limit;
 		ext2_dirent *de;
 		struct page *page = ext2_get_page(inode, n, 0, (void **)&kaddr);
 
 		if (IS_ERR(page)) {
-			ext2_error(sb, __func__,
-				   "bad page in #%lu",
+			ext2_error(sb, __func__, "bad page in #%lu",
 				   inode->i_ino);
 			ctx->pos += PAGE_SIZE - offset;
 			return PTR_ERR(page);
 		}
 		if (unlikely(need_revalidate)) {
 			if (offset) {
-				offset = ext2_validate_entry(kaddr, offset, chunk_mask);
-				ctx->pos = (n<<PAGE_SHIFT) + offset;
+				offset = ext2_validate_entry(kaddr, offset,
+							     chunk_mask);
+				ctx->pos = (n << PAGE_SHIFT) + offset;
 			}
 			file->f_version = inode_query_iversion(inode);
 			need_revalidate = false;
 		}
-		de = (ext2_dirent *)(kaddr+offset);
+		de = (ext2_dirent *)(kaddr + offset);
 		limit = kaddr + ext2_last_byte(inode, n) - EXT2_DIR_REC_LEN(1);
-		for ( ;(char*)de <= limit; de = ext2_next_entry(de)) {
+		for (; (char *)de <= limit; de = ext2_next_entry(de)) {
 			if (de->rec_len == 0) {
 				ext2_error(sb, __func__,
-					"zero-length directory entry");
+					   "zero-length directory entry");
 				ext2_put_page(page, kaddr);
 				return -EIO;
 			}
@@ -313,11 +314,11 @@ ext2_readdir(struct file *file, struct dir_context *ctx)
 				unsigned char d_type = DT_UNKNOWN;
 
 				if (has_filetype)
-					d_type = fs_ftype_to_dtype(de->file_type);
+					d_type = fs_ftype_to_dtype(
+						de->file_type);
 
 				if (!dir_emit(ctx, de->name, de->name_len,
-						le32_to_cpu(de->inode),
-						d_type)) {
+					      le32_to_cpu(de->inode), d_type)) {
 					ext2_put_page(page, kaddr);
 					return 0;
 				}
@@ -345,9 +346,10 @@ ext2_readdir(struct file *file, struct dir_context *ctx)
  * ext2_find_entry() and ext2_dotdot() act as a call to ext2_get_page() and
  * should be treated as a call to ext2_get_page() for nesting purposes.
  */
-struct ext2_dir_entry_2 *ext2_find_entry (struct inode *dir,
-			const struct qstr *child, struct page **res_page,
-			void **res_page_addr)
+struct ext2_dir_entry_2 *ext2_find_entry(struct inode *dir,
+					 const struct qstr *child,
+					 struct page **res_page,
+					 void **res_page_addr)
 {
 	const char *name = child->name;
 	int namelen = child->len;
@@ -356,7 +358,7 @@ struct ext2_dir_entry_2 *ext2_find_entry (struct inode *dir,
 	unsigned long npages = dir_pages(dir);
 	struct page *page = NULL;
 	struct ext2_inode_info *ei = EXT2_I(dir);
-	ext2_dirent * de;
+	ext2_dirent *de;
 	void *page_addr;
 
 	if (npages == 0)
@@ -377,12 +379,12 @@ struct ext2_dir_entry_2 *ext2_find_entry (struct inode *dir,
 			return ERR_CAST(page);
 
 		kaddr = page_addr;
-		de = (ext2_dirent *) kaddr;
+		de = (ext2_dirent *)kaddr;
 		kaddr += ext2_last_byte(dir, n) - reclen;
-		while ((char *) de <= kaddr) {
+		while ((char *)de <= kaddr) {
 			if (de->rec_len == 0) {
 				ext2_error(dir->i_sb, __func__,
-					"zero-length directory entry");
+					   "zero-length directory entry");
 				ext2_put_page(page, page_addr);
 				goto out;
 			}
@@ -397,9 +399,9 @@ struct ext2_dir_entry_2 *ext2_find_entry (struct inode *dir,
 		/* next page is past the blocks we've got */
 		if (unlikely(n > (dir->i_blocks >> (PAGE_SHIFT - 9)))) {
 			ext2_error(dir->i_sb, __func__,
-				"dir %lu size %lld exceeds block count %llu",
-				dir->i_ino, dir->i_size,
-				(unsigned long long)dir->i_blocks);
+				   "dir %lu size %lld exceeds block count %llu",
+				   dir->i_ino, dir->i_size,
+				   (unsigned long long)dir->i_blocks);
 			goto out;
 		}
 	} while (n != start);
@@ -433,7 +435,7 @@ struct ext2_dir_entry_2 *ext2_dotdot(struct inode *dir, struct page **p,
 	ext2_dirent *de = NULL;
 
 	if (!IS_ERR(page)) {
-		de = ext2_next_entry((ext2_dirent *) page_addr);
+		de = ext2_next_entry((ext2_dirent *)page_addr);
 		*p = page;
 		*pa = page_addr;
 	}
@@ -445,7 +447,7 @@ int ext2_inode_by_name(struct inode *dir, const struct qstr *child, ino_t *ino)
 	struct ext2_dir_entry_2 *de;
 	struct page *page;
 	void *page_addr;
-	
+
 	de = ext2_find_entry(dir, child, &page, &page_addr);
 	if (IS_ERR(de))
 		return PTR_ERR(de);
@@ -464,8 +466,7 @@ void ext2_set_link(struct inode *dir, struct ext2_dir_entry_2 *de,
 		   struct page *page, void *page_addr, struct inode *inode,
 		   int update_times)
 {
-	loff_t pos = page_offset(page) +
-			(char *) de - (char *) page_addr;
+	loff_t pos = page_offset(page) + (char *)de - (char *)page_addr;
 	unsigned len = ext2_rec_len_from_disk(de->rec_len);
 	int err;
 
@@ -484,7 +485,7 @@ void ext2_set_link(struct inode *dir, struct ext2_dir_entry_2 *de,
 /*
  *	Parent is locked.
  */
-int ext2_add_link (struct dentry *dentry, struct inode *inode)
+int ext2_add_link(struct dentry *dentry, struct inode *inode)
 {
 	struct inode *dir = d_inode(dentry->d_parent);
 	const char *name = dentry->d_name.name;
@@ -494,7 +495,7 @@ int ext2_add_link (struct dentry *dentry, struct inode *inode)
 	unsigned short rec_len, name_len;
 	struct page *page = NULL;
 	void *page_addr = NULL;
-	ext2_dirent * de;
+	ext2_dirent *de;
 	unsigned long npages = dir_pages(dir);
 	unsigned long n;
 	loff_t pos;
@@ -529,12 +530,12 @@ int ext2_add_link (struct dentry *dentry, struct inode *inode)
 			}
 			if (de->rec_len == 0) {
 				ext2_error(dir->i_sb, __func__,
-					"zero-length directory entry");
+					   "zero-length directory entry");
 				err = -EIO;
 				goto out_unlock;
 			}
 			err = -EEXIST;
-			if (ext2_match (namelen, name, de))
+			if (ext2_match(namelen, name, de))
 				goto out_unlock;
 			name_len = EXT2_DIR_REC_LEN(de->name_len);
 			rec_len = ext2_rec_len_from_disk(de->rec_len);
@@ -542,7 +543,7 @@ int ext2_add_link (struct dentry *dentry, struct inode *inode)
 				goto got_it;
 			if (rec_len >= name_len + reclen)
 				goto got_it;
-			de = (ext2_dirent *) ((char *) de + rec_len);
+			de = (ext2_dirent *)((char *)de + rec_len);
 		}
 		unlock_page(page);
 		ext2_put_page(page, page_addr);
@@ -551,13 +552,12 @@ int ext2_add_link (struct dentry *dentry, struct inode *inode)
 	return -EINVAL;
 
 got_it:
-	pos = page_offset(page) +
-		(char *)de - (char *)page_addr;
+	pos = page_offset(page) + (char *)de - (char *)page_addr;
 	err = ext2_prepare_chunk(page, pos, rec_len);
 	if (err)
 		goto out_unlock;
 	if (de->inode) {
-		ext2_dirent *de1 = (ext2_dirent *) ((char *) de + name_len);
+		ext2_dirent *de1 = (ext2_dirent *)((char *)de + name_len);
 		de1->rec_len = ext2_rec_len_to_disk(rec_len - name_len);
 		de->rec_len = ext2_rec_len_to_disk(name_len);
 		de = de1;
@@ -565,7 +565,7 @@ got_it:
 	de->name_len = namelen;
 	memcpy(de->name, name, namelen);
 	de->inode = cpu_to_le32(inode->i_ino);
-	ext2_set_de_type (de, inode);
+	ext2_set_de_type(de, inode);
 	err = ext2_commit_chunk(page, pos, rec_len);
 	dir->i_mtime = dir->i_ctime = current_time(dir);
 	EXT2_I(dir)->i_flags &= ~EXT2_BTREE_FL;
@@ -584,22 +584,22 @@ out_unlock:
  * ext2_delete_entry deletes a directory entry by merging it with the
  * previous entry. Page is up-to-date.
  */
-int ext2_delete_entry (struct ext2_dir_entry_2 *dir, struct page *page,
-			char *kaddr)
+int ext2_delete_entry(struct ext2_dir_entry_2 *dir, struct page *page)
 {
 	struct inode *inode = page->mapping->host;
-	unsigned from = ((char*)dir - kaddr) & ~(ext2_chunk_size(inode)-1);
-	unsigned to = ((char *)dir - kaddr) +
-				ext2_rec_len_from_disk(dir->rec_len);
+	char *kaddr = page_address(page);
+	unsigned from = ((char *)dir - kaddr) & ~(ext2_chunk_size(inode) - 1);
+	unsigned to =
+		((char *)dir - kaddr) + ext2_rec_len_from_disk(dir->rec_len);
 	loff_t pos;
-	ext2_dirent * pde = NULL;
-	ext2_dirent * de = (ext2_dirent *) (kaddr + from);
+	ext2_dirent *pde = NULL;
+	ext2_dirent *de = (ext2_dirent *)(kaddr + from);
 	int err;
 
-	while ((char*)de < (char*)dir) {
+	while ((char *)de < (char *)dir) {
 		if (de->rec_len == 0) {
 			ext2_error(inode->i_sb, __func__,
-				"zero-length directory entry");
+				   "zero-length directory entry");
 			err = -EIO;
 			goto out;
 		}
@@ -607,7 +607,7 @@ int ext2_delete_entry (struct ext2_dir_entry_2 *dir, struct page *page,
 		de = ext2_next_entry(de);
 	}
 	if (pde)
-		from = (char *)pde - kaddr;
+		from = (char *)pde - (char *)page_address(page);
 	pos = page_offset(page) + from;
 	lock_page(page);
 	err = ext2_prepare_chunk(page, pos, to - from);
@@ -630,7 +630,7 @@ int ext2_make_empty(struct inode *inode, struct inode *parent)
 {
 	struct page *page = grab_cache_page(inode->i_mapping, 0);
 	unsigned chunk_size = ext2_chunk_size(inode);
-	struct ext2_dir_entry_2 * de;
+	struct ext2_dir_entry_2 *de;
 	int err;
 	void *kaddr;
 
@@ -647,16 +647,16 @@ int ext2_make_empty(struct inode *inode, struct inode *parent)
 	de = (struct ext2_dir_entry_2 *)kaddr;
 	de->name_len = 1;
 	de->rec_len = ext2_rec_len_to_disk(EXT2_DIR_REC_LEN(1));
-	memcpy (de->name, ".\0\0", 4);
+	memcpy(de->name, ".\0\0", 4);
 	de->inode = cpu_to_le32(inode->i_ino);
-	ext2_set_de_type (de, inode);
+	ext2_set_de_type(de, inode);
 
 	de = (struct ext2_dir_entry_2 *)(kaddr + EXT2_DIR_REC_LEN(1));
 	de->name_len = 2;
 	de->rec_len = ext2_rec_len_to_disk(chunk_size - EXT2_DIR_REC_LEN(1));
 	de->inode = cpu_to_le32(parent->i_ino);
-	memcpy (de->name, "..\0", 4);
-	ext2_set_de_type (de, inode);
+	memcpy(de->name, "..\0", 4);
+	ext2_set_de_type(de, inode);
 	kunmap_atomic(kaddr);
 	err = ext2_commit_chunk(page, 0, chunk_size);
 fail:
@@ -667,7 +667,7 @@ fail:
 /*
  * routine to check that the specified directory is empty (for rmdir)
  */
-int ext2_empty_dir (struct inode * inode)
+int ext2_empty_dir(struct inode *inode)
 {
 	void *page_addr = NULL;
 	struct page *page = NULL;
@@ -676,7 +676,7 @@ int ext2_empty_dir (struct inode * inode)
 
 	for (i = 0; i < npages; i++) {
 		char *kaddr;
-		ext2_dirent * de;
+		ext2_dirent *de;
 		page = ext2_get_page(inode, i, dir_has_error, &page_addr);
 
 		if (IS_ERR(page)) {
@@ -691,7 +691,7 @@ int ext2_empty_dir (struct inode * inode)
 		while ((char *)de <= kaddr) {
 			if (de->rec_len == 0) {
 				ext2_error(inode->i_sb, __func__,
-					"zero-length directory entry");
+					   "zero-length directory entry");
 				printk("kaddr=%p, de=%p\n", kaddr, de);
 				goto not_empty;
 			}
@@ -720,12 +720,12 @@ not_empty:
 }
 
 const struct file_operations ext2_dir_operations = {
-	.llseek		= generic_file_llseek,
-	.read		= generic_read_dir,
-	.iterate_shared	= ext2_readdir,
+	.llseek = generic_file_llseek,
+	.read = generic_read_dir,
+	.iterate_shared = ext2_readdir,
 	.unlocked_ioctl = ext2_ioctl,
 #ifdef CONFIG_COMPAT
-	.compat_ioctl	= ext2_compat_ioctl,
+	.compat_ioctl = ext2_compat_ioctl,
 #endif
-	.fsync		= ext2_fsync,
+	.fsync = ext2_fsync,
 };

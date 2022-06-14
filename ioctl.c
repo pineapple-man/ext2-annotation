@@ -27,8 +27,8 @@ int ext2_fileattr_get(struct dentry *dentry, struct fileattr *fa)
 	return 0;
 }
 
-int ext2_fileattr_set(struct user_namespace *mnt_userns,
-		      struct dentry *dentry, struct fileattr *fa)
+int ext2_fileattr_set(struct user_namespace *mnt_userns, struct dentry *dentry,
+		      struct fileattr *fa)
 {
 	struct inode *inode = d_inode(dentry);
 	struct ext2_inode_info *ei = EXT2_I(inode);
@@ -41,7 +41,7 @@ int ext2_fileattr_set(struct user_namespace *mnt_userns,
 		return -EPERM;
 
 	ei->i_flags = (ei->i_flags & ~EXT2_FL_USER_MODIFIABLE) |
-		(fa->flags & EXT2_FL_USER_MODIFIABLE);
+		      (fa->flags & EXT2_FL_USER_MODIFIABLE);
 
 	ext2_set_inode_flags(inode);
 	inode->i_ctime = current_time(inode);
@@ -50,7 +50,6 @@ int ext2_fileattr_set(struct user_namespace *mnt_userns,
 	return 0;
 }
 
-
 long ext2_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
 	struct inode *inode = file_inode(filp);
@@ -58,11 +57,11 @@ long ext2_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	unsigned short rsv_window_size;
 	int ret;
 
-	ext2_debug ("cmd = %u, arg = %lu\n", cmd, arg);
+	ext2_debug("cmd = %u, arg = %lu\n", cmd, arg);
 
 	switch (cmd) {
 	case EXT2_IOC_GETVERSION:
-		return put_user(inode->i_generation, (int __user *) arg);
+		return put_user(inode->i_generation, (int __user *)arg);
 	case EXT2_IOC_SETVERSION: {
 		__u32 generation;
 
@@ -71,7 +70,7 @@ long ext2_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		ret = mnt_want_write_file(filp);
 		if (ret)
 			return ret;
-		if (get_user(generation, (int __user *) arg)) {
+		if (get_user(generation, (int __user *)arg)) {
 			ret = -EFAULT;
 			goto setversion_out;
 		}
@@ -82,21 +81,22 @@ long ext2_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		inode_unlock(inode);
 
 		mark_inode_dirty(inode);
-setversion_out:
+	setversion_out:
 		mnt_drop_write_file(filp);
 		return ret;
 	}
 	case EXT2_IOC_GETRSVSZ:
-		if (test_opt(inode->i_sb, RESERVATION)
-			&& S_ISREG(inode->i_mode)
-			&& ei->i_block_alloc_info) {
-			rsv_window_size = ei->i_block_alloc_info->rsv_window_node.rsv_goal_size;
+		if (test_opt(inode->i_sb, RESERVATION) &&
+		    S_ISREG(inode->i_mode) && ei->i_block_alloc_info) {
+			rsv_window_size =
+				ei->i_block_alloc_info->rsv_window_node
+					.rsv_goal_size;
 			return put_user(rsv_window_size, (int __user *)arg);
 		}
 		return -ENOTTY;
 	case EXT2_IOC_SETRSVSZ: {
-
-		if (!test_opt(inode->i_sb, RESERVATION) ||!S_ISREG(inode->i_mode))
+		if (!test_opt(inode->i_sb, RESERVATION) ||
+		    !S_ISREG(inode->i_mode))
 			return -ENOTTY;
 
 		if (!inode_owner_or_capable(&init_user_ns, inode))
@@ -124,8 +124,9 @@ setversion_out:
 		if (!ei->i_block_alloc_info)
 			ext2_init_block_alloc_info(inode);
 
-		if (ei->i_block_alloc_info){
-			struct ext2_reserve_window_node *rsv = &ei->i_block_alloc_info->rsv_window_node;
+		if (ei->i_block_alloc_info) {
+			struct ext2_reserve_window_node *rsv =
+				&ei->i_block_alloc_info->rsv_window_node;
 			rsv->rsv_goal_size = rsv_window_size;
 		} else {
 			ret = -ENOMEM;
@@ -154,6 +155,6 @@ long ext2_compat_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	default:
 		return -ENOIOCTLCMD;
 	}
-	return ext2_ioctl(file, cmd, (unsigned long) compat_ptr(arg));
+	return ext2_ioctl(file, cmd, (unsigned long)compat_ptr(arg));
 }
 #endif

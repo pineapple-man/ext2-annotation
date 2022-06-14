@@ -8,24 +8,22 @@
 #include <linux/security.h>
 #include "xattr.h"
 
-static int
-ext2_xattr_security_get(const struct xattr_handler *handler,
-			struct dentry *unused, struct inode *inode,
-			const char *name, void *buffer, size_t size)
+static int ext2_xattr_security_get(const struct xattr_handler *handler,
+				   struct dentry *unused, struct inode *inode,
+				   const char *name, void *buffer, size_t size)
 {
-	return ext2_xattr_get(inode, EXT2_XATTR_INDEX_SECURITY, name,
-			      buffer, size);
+	return ext2_xattr_get(inode, EXT2_XATTR_INDEX_SECURITY, name, buffer,
+			      size);
 }
 
-static int
-ext2_xattr_security_set(const struct xattr_handler *handler,
-			struct user_namespace *mnt_userns,
-			struct dentry *unused, struct inode *inode,
-			const char *name, const void *value,
-			size_t size, int flags)
+static int ext2_xattr_security_set(const struct xattr_handler *handler,
+				   struct user_namespace *mnt_userns,
+				   struct dentry *unused, struct inode *inode,
+				   const char *name, const void *value,
+				   size_t size, int flags)
 {
-	return ext2_xattr_set(inode, EXT2_XATTR_INDEX_SECURITY, name,
-			      value, size, flags);
+	return ext2_xattr_set(inode, EXT2_XATTR_INDEX_SECURITY, name, value,
+			      size, flags);
 }
 
 static int ext2_initxattrs(struct inode *inode, const struct xattr *xattr_array,
@@ -44,16 +42,15 @@ static int ext2_initxattrs(struct inode *inode, const struct xattr *xattr_array,
 	return err;
 }
 
-int
-ext2_init_security(struct inode *inode, struct inode *dir,
-		   const struct qstr *qstr)
+int ext2_init_security(struct inode *inode, struct inode *dir,
+		       const struct qstr *qstr)
 {
-	return security_inode_init_security(inode, dir, qstr,
-					    &ext2_initxattrs, NULL);
+	return security_inode_init_security(inode, dir, qstr, &ext2_initxattrs,
+					    NULL);
 }
 
 const struct xattr_handler ext2_xattr_security_handler = {
-	.prefix	= XATTR_SECURITY_PREFIX,
-	.get	= ext2_xattr_security_get,
-	.set	= ext2_xattr_security_set,
+	.prefix = XATTR_SECURITY_PREFIX,
+	.get = ext2_xattr_security_get,
+	.set = ext2_xattr_security_set,
 };

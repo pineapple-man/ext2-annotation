@@ -16,8 +16,7 @@
 /*
  * Convert from filesystem to in-memory representation.
  */
-static struct posix_acl *
-ext2_acl_from_disk(const void *value, size_t size)
+static struct posix_acl *ext2_acl_from_disk(const void *value, size_t size)
 {
 	const char *end = (char *)value + size;
 	int n, count;
@@ -26,7 +25,7 @@ ext2_acl_from_disk(const void *value, size_t size)
 	if (!value)
 		return NULL;
 	if (size < sizeof(ext2_acl_header))
-		 return ERR_PTR(-EINVAL);
+		return ERR_PTR(-EINVAL);
 	if (((ext2_acl_header *)value)->a_version !=
 	    cpu_to_le32(EXT2_ACL_VERSION))
 		return ERR_PTR(-EINVAL);
@@ -39,41 +38,37 @@ ext2_acl_from_disk(const void *value, size_t size)
 	acl = posix_acl_alloc(count, GFP_KERNEL);
 	if (!acl)
 		return ERR_PTR(-ENOMEM);
-	for (n=0; n < count; n++) {
-		ext2_acl_entry *entry =
-			(ext2_acl_entry *)value;
+	for (n = 0; n < count; n++) {
+		ext2_acl_entry *entry = (ext2_acl_entry *)value;
 		if ((char *)value + sizeof(ext2_acl_entry_short) > end)
 			goto fail;
-		acl->a_entries[n].e_tag  = le16_to_cpu(entry->e_tag);
+		acl->a_entries[n].e_tag = le16_to_cpu(entry->e_tag);
 		acl->a_entries[n].e_perm = le16_to_cpu(entry->e_perm);
-		switch(acl->a_entries[n].e_tag) {
-			case ACL_USER_OBJ:
-			case ACL_GROUP_OBJ:
-			case ACL_MASK:
-			case ACL_OTHER:
-				value = (char *)value +
-					sizeof(ext2_acl_entry_short);
-				break;
+		switch (acl->a_entries[n].e_tag) {
+		case ACL_USER_OBJ:
+		case ACL_GROUP_OBJ:
+		case ACL_MASK:
+		case ACL_OTHER:
+			value = (char *)value + sizeof(ext2_acl_entry_short);
+			break;
 
-			case ACL_USER:
-				value = (char *)value + sizeof(ext2_acl_entry);
-				if ((char *)value > end)
-					goto fail;
-				acl->a_entries[n].e_uid =
-					make_kuid(&init_user_ns,
-						  le32_to_cpu(entry->e_id));
-				break;
-			case ACL_GROUP:
-				value = (char *)value + sizeof(ext2_acl_entry);
-				if ((char *)value > end)
-					goto fail;
-				acl->a_entries[n].e_gid =
-					make_kgid(&init_user_ns,
-						  le32_to_cpu(entry->e_id));
-				break;
-
-			default:
+		case ACL_USER:
+			value = (char *)value + sizeof(ext2_acl_entry);
+			if ((char *)value > end)
 				goto fail;
+			acl->a_entries[n].e_uid = make_kuid(
+				&init_user_ns, le32_to_cpu(entry->e_id));
+			break;
+		case ACL_GROUP:
+			value = (char *)value + sizeof(ext2_acl_entry);
+			if ((char *)value > end)
+				goto fail;
+			acl->a_entries[n].e_gid = make_kgid(
+				&init_user_ns, le32_to_cpu(entry->e_id));
+			break;
+
+		default:
+			goto fail;
 		}
 	}
 	if (value != end)
@@ -88,46 +83,46 @@ fail:
 /*
  * Convert from in-memory to filesystem representation.
  */
-static void *
-ext2_acl_to_disk(const struct posix_acl *acl, size_t *size)
+static void *ext2_acl_to_disk(const struct posix_acl *acl, size_t *size)
 {
 	ext2_acl_header *ext_acl;
 	char *e;
 	size_t n;
 
 	*size = ext2_acl_size(acl->a_count);
-	ext_acl = kmalloc(sizeof(ext2_acl_header) + acl->a_count *
-			sizeof(ext2_acl_entry), GFP_KERNEL);
+	ext_acl = kmalloc(sizeof(ext2_acl_header) +
+				  acl->a_count * sizeof(ext2_acl_entry),
+			  GFP_KERNEL);
 	if (!ext_acl)
 		return ERR_PTR(-ENOMEM);
 	ext_acl->a_version = cpu_to_le32(EXT2_ACL_VERSION);
 	e = (char *)ext_acl + sizeof(ext2_acl_header);
-	for (n=0; n < acl->a_count; n++) {
+	for (n = 0; n < acl->a_count; n++) {
 		const struct posix_acl_entry *acl_e = &acl->a_entries[n];
 		ext2_acl_entry *entry = (ext2_acl_entry *)e;
-		entry->e_tag  = cpu_to_le16(acl_e->e_tag);
+		entry->e_tag = cpu_to_le16(acl_e->e_tag);
 		entry->e_perm = cpu_to_le16(acl_e->e_perm);
-		switch(acl_e->e_tag) {
-			case ACL_USER:
-				entry->e_id = cpu_to_le32(
-					from_kuid(&init_user_ns, acl_e->e_uid));
-				e += sizeof(ext2_acl_entry);
-				break;
-			case ACL_GROUP:
-				entry->e_id = cpu_to_le32(
-					from_kgid(&init_user_ns, acl_e->e_gid));
-				e += sizeof(ext2_acl_entry);
-				break;
+		switch (acl_e->e_tag) {
+		case ACL_USER:
+			entry->e_id = cpu_to_le32(
+				from_kuid(&init_user_ns, acl_e->e_uid));
+			e += sizeof(ext2_acl_entry);
+			break;
+		case ACL_GROUP:
+			entry->e_id = cpu_to_le32(
+				from_kgid(&init_user_ns, acl_e->e_gid));
+			e += sizeof(ext2_acl_entry);
+			break;
 
-			case ACL_USER_OBJ:
-			case ACL_GROUP_OBJ:
-			case ACL_MASK:
-			case ACL_OTHER:
-				e += sizeof(ext2_acl_entry_short);
-				break;
+		case ACL_USER_OBJ:
+		case ACL_GROUP_OBJ:
+		case ACL_MASK:
+		case ACL_OTHER:
+			e += sizeof(ext2_acl_entry_short);
+			break;
 
-			default:
-				goto fail;
+		default:
+			goto fail;
 		}
 	}
 	return (char *)ext_acl;
@@ -140,16 +135,12 @@ fail:
 /*
  * inode->i_mutex: don't care
  */
-struct posix_acl *
-ext2_get_acl(struct inode *inode, int type, bool rcu)
+struct posix_acl *ext2_get_acl(struct inode *inode, int type)
 {
 	int name_index;
 	char *value = NULL;
 	struct posix_acl *acl;
 	int retval;
-
-	if (rcu)
-		return ERR_PTR(-ECHILD);
 
 	switch (type) {
 	case ACL_TYPE_ACCESS:
@@ -179,29 +170,28 @@ ext2_get_acl(struct inode *inode, int type, bool rcu)
 	return acl;
 }
 
-static int
-__ext2_set_acl(struct inode *inode, struct posix_acl *acl, int type)
+static int __ext2_set_acl(struct inode *inode, struct posix_acl *acl, int type)
 {
 	int name_index;
 	void *value = NULL;
 	size_t size = 0;
 	int error;
 
-	switch(type) {
-		case ACL_TYPE_ACCESS:
-			name_index = EXT2_XATTR_INDEX_POSIX_ACL_ACCESS;
-			break;
+	switch (type) {
+	case ACL_TYPE_ACCESS:
+		name_index = EXT2_XATTR_INDEX_POSIX_ACL_ACCESS;
+		break;
 
-		case ACL_TYPE_DEFAULT:
-			name_index = EXT2_XATTR_INDEX_POSIX_ACL_DEFAULT;
-			if (!S_ISDIR(inode->i_mode))
-				return acl ? -EACCES : 0;
-			break;
+	case ACL_TYPE_DEFAULT:
+		name_index = EXT2_XATTR_INDEX_POSIX_ACL_DEFAULT;
+		if (!S_ISDIR(inode->i_mode))
+			return acl ? -EACCES : 0;
+		break;
 
-		default:
-			return -EINVAL;
+	default:
+		return -EINVAL;
 	}
- 	if (acl) {
+	if (acl) {
 		value = ext2_acl_to_disk(acl, &size);
 		if (IS_ERR(value))
 			return (int)PTR_ERR(value);
@@ -218,9 +208,8 @@ __ext2_set_acl(struct inode *inode, struct posix_acl *acl, int type)
 /*
  * inode->i_mutex: down
  */
-int
-ext2_set_acl(struct user_namespace *mnt_userns, struct inode *inode,
-	     struct posix_acl *acl, int type)
+int ext2_set_acl(struct user_namespace *mnt_userns, struct inode *inode,
+		 struct posix_acl *acl, int type)
 {
 	int error;
 	int update_mode = 0;
@@ -248,8 +237,7 @@ ext2_set_acl(struct user_namespace *mnt_userns, struct inode *inode,
  * dir->i_mutex: down
  * inode->i_mutex: up (access to inode is still exclusive)
  */
-int
-ext2_init_acl(struct inode *inode, struct inode *dir)
+int ext2_init_acl(struct inode *inode, struct inode *dir)
 {
 	struct posix_acl *default_acl, *acl;
 	int error;
