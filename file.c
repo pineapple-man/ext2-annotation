@@ -179,7 +179,7 @@ static ssize_t ext2_file_write_iter(struct kiocb *iocb, struct iov_iter *from)
 #endif
 	return generic_file_write_iter(iocb, from);
 }
-
+/* ext2 对 file 的 operation */
 const struct file_operations ext2_file_operations = {
 	.llseek = generic_file_llseek,
 	.read_iter = ext2_file_read_iter,
@@ -196,7 +196,7 @@ const struct file_operations ext2_file_operations = {
 	.splice_read = generic_file_splice_read,
 	.splice_write = iter_file_splice_write,
 };
-
+/* ext2 file system inode operation is defined for the opeartions on an inode */
 const struct inode_operations ext2_file_inode_operations = {
 	.listxattr = ext2_listxattr,
 	.getattr = ext2_getattr,

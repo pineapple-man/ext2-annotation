@@ -827,6 +827,7 @@ static unsigned long descriptor_loc(struct super_block *sb,
 	return ext2_group_first_block_no(sb, bg) + ext2_bg_has_super(sb, bg);
 }
 
+/* loading super block data from the disk to mem */
 static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 {
 	struct dax_device *dax_dev = fs_dax_get_by_bdev(sb->s_bdev);
@@ -1484,6 +1485,7 @@ static int ext2_statfs(struct dentry *dentry, struct kstatfs *buf)
 	return 0;
 }
 
+/* ext2 file sytem mount function */
 static struct dentry *ext2_mount(struct file_system_type *fs_type, int flags,
 				 const char *dev_name, void *data)
 {
