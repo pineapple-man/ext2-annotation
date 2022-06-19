@@ -836,5 +836,6 @@ static inline ext2_fsblk_t ext2_group_last_block_no(struct super_block *sb,
 #define ext2_set_bit __test_and_set_bit_le
 #define ext2_clear_bit __test_and_clear_bit_le
 #define ext2_test_bit test_bit_le
+/* find first zero bit  */
 #define ext2_find_first_zero_bit find_first_zero_bit_le
 #define ext2_find_next_zero_bit find_next_zero_bit_le

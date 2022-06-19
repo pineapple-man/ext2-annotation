@@ -54,6 +54,17 @@ static inline int ext2_add_nondir(struct dentry *dentry, struct inode *inode) {
 
 static struct dentry *ext2_lookup(struct inode *dir, struct dentry *dentry,
                                   unsigned int flags) {
+  /**
+   * This function is called indirectly when information about the inode
+   * associated with an entry in a directory is needed. Such a function performs
+   * the following operations:
+   * 1. Searches in the directory indicated by `dir` the entry having the name
+   * `dentry->d_name.name`
+   * 2. If the entry is found,it will return NULL and associate the inode with
+   * the name using the `d_add()` function
+   * 3. otherwise, return `ERR_PTR`
+   *
+   */
   struct inode *inode;
   ino_t ino;
   int res;
@@ -270,6 +281,15 @@ out_dir:
 }
 
 static int ext2_unlink(struct inode *dir, struct dentry *dentry) {
+  /**
+   * This function is called by the `unlink` system call. such a function
+   * performs the following operations:
+   * 1. Deletes the directory entry given as a parameter from the physical disk
+   * structure.
+   * 2. Decrements the `i_nlink` counter of the inode to which the entry points
+   * (otherwise the inode will never be deleted).
+   *
+   */
   struct inode *inode = d_inode(dentry);
   struct ext2_dir_entry_2 *de;
   struct page *page;
@@ -297,6 +317,13 @@ out:
 }
 
 static int ext2_rmdir(struct inode *dir, struct dentry *dentry) {
+  /**
+   * This function if called by the `rmdir` system call. Such a function
+   * performs the following operating:
+   * 1. Performs the operations done by the `ext2_unlink`
+   * 2. Ensures that the directory is empty, otherwise, return `ENOTEMPTY`
+   * 3. Also deletes the data blocks.
+   */
   struct inode *inode = d_inode(dentry);
   int err = -ENOTEMPTY;
 
@@ -402,14 +429,17 @@ const struct inode_operations ext2_dir_inode_operations = {
     /* inode creation function. This function is called by the open and creat
        system calls.  */
     .create = ext2_create,
+    /* searches for an entry in a directory and extracts the inode  */
     .lookup = ext2_lookup,
     .link = ext2_link,
+    /* The link delete function (hard link)  */
     .unlink = ext2_unlink,
     /* THe link creation function(hard link) */
     .symlink = ext2_symlink,
     /* the directory creation function is indicated by the `mkdir` field. This
        function is called by the `mkdir` system call.  */
     .mkdir = ext2_mkdir,
+    /* The directory delete function */
     .rmdir = ext2_rmdir,
     .mknod = ext2_mknod,
     .rename = ext2_rename,
