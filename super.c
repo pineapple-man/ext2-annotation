@@ -827,7 +827,11 @@ static unsigned long descriptor_loc(struct super_block *sb,
 	return ext2_group_first_block_no(sb, bg) + ext2_bg_has_super(sb, bg);
 }
 
-/* loading super block data from the disk to mem */
+/**
+ * loading super block data from the disk to mem
+ * 1.该函数会从块设备读取超级块的数据，并且填充到 `ext2_sb_info` 结构体中，最终完成
+ * `ext2_sb_info` 和 `super_block` 结构体的初始化
+ * 2.从磁盘读取根目录的 inode 信息,然后完成 inode 和 dentry 的初始化及关联 */
 static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 {
 	struct dax_device *dax_dev = fs_dax_get_by_bdev(sb->s_bdev);
@@ -1485,10 +1489,14 @@ static int ext2_statfs(struct dentry *dentry, struct kstatfs *buf)
 	return 0;
 }
 
-/* ext2 file sytem mount function */
+/** ext2 file sytem mount function.
+ * mount function 主要集中从磁盘读取超级块的信息，完成超级块和根目录的初始化，
+ * 最终返回一个 dentry 指针
+ */
 static struct dentry *ext2_mount(struct file_system_type *fs_type, int flags,
 				 const char *dev_name, void *data)
 {
+	/* 超级块信息的填充，主要在函数指针 `ext2_fill_super` 中进行 */
 	return mount_bdev(fs_type, flags, dev_name, data, ext2_fill_super);
 }
 
