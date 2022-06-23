@@ -29,6 +29,7 @@
 #include "xattr.h"
 #include "acl.h"
 
+/* DAX  I/O 模式 */
 #ifdef CONFIG_FS_DAX
 static ssize_t ext2_dax_read_iter(struct kiocb *iocb, struct iov_iter *to)
 {
@@ -170,19 +171,29 @@ static ssize_t ext2_file_read_iter(struct kiocb *iocb, struct iov_iter *to)
 #endif
 	return generic_file_read_iter(iocb, to);
 }
-
+/**
+ * @brief ext2 写数据操作函数，会被 vfs 中的 `vfs_write()` 调用
+ * 写数据操作会存在如下集中模式：
+ * 1. DAX 模式：数据不经过文件系统缓存，也不经过通用块 I/O 栈，直接通过驱动程序将数据写入物理设备
+ * 2. Direct I/O 模式：数据绕过文件系统缓存，但需要经过通用块 I/O 栈
+ * 3. Normal I/O 模式：数据会先写入缓存。同时有两种不同的处理方式：一种是直接写入缓存层后返回；另一种是写入缓存层并等待数据写入持久化设备后返回
+ * 
+ */
 static ssize_t ext2_file_write_iter(struct kiocb *iocb, struct iov_iter *from)
 {
+	/* 如果配置 DAX 模式，就直接使用 DAX 方式写数据 */
 #ifdef CONFIG_FS_DAX
 	if (IS_DAX(iocb->ki_filp->f_mapping->host))
 		return ext2_dax_write_iter(iocb, from);
 #endif
+	/* 常规模式写文件流程 */
 	return generic_file_write_iter(iocb, from);
 }
 /* ext2 对 file 的 operation */
 const struct file_operations ext2_file_operations = {
 	.llseek = generic_file_llseek,
 	.read_iter = ext2_file_read_iter,
+/* 对于文件的写操作，vfs 会调用这个函数 */
 	.write_iter = ext2_file_write_iter,
 	.unlocked_ioctl = ext2_ioctl,
 #ifdef CONFIG_COMPAT
